@@ -58,18 +58,11 @@ const Storage=(()=>{
       if(error)throw error;return Number(data);
     },
     replaceAll:async(projects,meta)=>{
-      const user_id=await uid();
-      const db=ready();
-      const {error:delError}=await db.from('crm_projects').delete().eq('user_id',user_id);
-      if(delError)throw delError;
-      if(projects.length){
-        const rows=projects.map(p=>({user_id,id:String(p.id),num:Number(p.num),data:p,updated_at:new Date().toISOString()}));
-        const {error}=await db.from('crm_projects').upsert(rows,{onConflict:'user_id,id'});if(error)throw error;
-      }
-      const {error:metaDelError}=await db.from('crm_meta').delete().eq('user_id',user_id);
-      if(metaDelError)throw metaDelError;
-      const metaRows=Object.entries(meta).map(([key,value])=>({user_id,key,value,updated_at:new Date().toISOString()}));
-      if(metaRows.length){const {error}=await db.from('crm_meta').upsert(metaRows,{onConflict:'user_id,key'});if(error)throw error}
+      const {error}=await ready().rpc('replace_crm_data',{
+        p_projects:projects,
+        p_meta:meta
+      });
+      if(error)throw error;
     }
   };
 })();
