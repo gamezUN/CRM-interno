@@ -90,6 +90,7 @@ respaldos:()=>`<div class="note">Tus datos se guardan en <b>IndexedDB</b>, dentr
 /* Registros iniciales de prospectos revisados el 30/10/2026.
    La migración es idempotente: no reemplaza ni modifica registros existentes. */
 async function seedReviewedProspects(){
+  if(await Storage.getMeta('initial_seed_completed'))return;
   const reviewed=[
     {
       id:'lead-corazon-contento-20261030',
@@ -132,6 +133,7 @@ async function seedReviewedProspects(){
       current.push(item);
     }
   }
+  await Storage.setMeta('initial_seed_completed',true);
 }
 
 async function render(){
