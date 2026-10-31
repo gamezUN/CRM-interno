@@ -1,28 +1,32 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Gámez Desarrollo Web · CRM</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b0f">
+  <meta name="description" content="CRM interno de Gámez Desarrollo Web para gestionar clientes, proyectos, seguimiento y finanzas.">
+  <title>Gámez Desarrollo Web · CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;750&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-    <aside id="side">
-        <div class="brand"><b>GÁMEZ DESARROLLO WEB</b><small>FREELANCE DEVELOPER</small></div>
-        <nav id="nav"></nav>
-    </aside>
-    <main>
-        <header><button id="burger" aria-label="Menú">☰</button>
-            <h1 id="title"></h1><button class="btn" data-a="nuevo">+ Nuevo proyecto</button>
-        </header>
-        <div id="app"></div>
-    </main>
-    <dialog id="dlg"></dialog>
-    <div id="toast" role="status"></div>
-    <script src="storage.js"></script>
-    <script src="app.js"></script>
+  <aside id="side">
+    <div class="brand"><b>GÁMEZ DESARROLLO WEB</b><small>FREELANCE DEVELOPER</small></div>
+    <nav id="nav" aria-label="Navegación principal"></nav>
+  </aside>
+  <main>
+    <header>
+      <button id="burger" aria-label="Abrir menú" aria-controls="side">☰</button>
+      <h1 id="title">Panel general</h1>
+      <button class="btn" data-a="nuevo">+ Nuevo proyecto</button>
+    </header>
+    <div id="app" aria-live="polite"></div>
+  </main>
+  <dialog id="dlg" aria-label="Formulario"></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
 </body>
-
 </html>
