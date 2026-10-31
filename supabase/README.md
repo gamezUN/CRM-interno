@@ -18,7 +18,7 @@ El SQL crea:
 - `crm_projects`: proyectos y sus datos completos en JSONB, incluidos pagos y observaciones.
 - `crm_meta`: metadatos por usuario.
 - `crm_counters`: consecutivos por usuario.
-- La función RPC `allocate_crm_project_number()` para asignar números sin colisiones.
+- La función RPC `allocate_crm_project_number()` para asignar números sin colisiones.\n- La función RPC `replace_crm_data()` para importar respaldos en una sola transacción y mantener el consecutivo.
 - Políticas RLS para que cada usuario solo vea sus propios datos.
 
 ## 2. Crear la cuenta de acceso
