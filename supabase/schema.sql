@@ -74,3 +74,59 @@ grant execute on function public.allocate_crm_project_number() to authenticated;
 -- La aplicación solo necesita permisos de cliente autenticado.
 grant select, insert, update, delete on public.crm_projects to authenticated;
 grant select, insert, update, delete on public.crm_meta to authenticated;
+
+-- Importación de respaldos atómica: si falla una validación o escritura,
+-- PostgreSQL revierte la transacción completa y conserva los datos anteriores.
+create or replace function public.replace_crm_data(p_projects jsonb, p_meta jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  project_item jsonb;
+  meta_item record;
+  owner_id uuid := auth.uid();
+  max_num integer := 0;
+  requested_next integer := 1;
+begin
+  if owner_id is null then raise exception 'Authentication required'; end if;
+  if jsonb_typeof(p_projects) <> 'array' then raise exception 'Projects must be a JSON array'; end if;
+  if jsonb_typeof(p_meta) <> 'object' then raise exception 'Metadata must be a JSON object'; end if;
+
+  for project_item in select value from jsonb_array_elements(p_projects)
+  loop
+    if coalesce(project_item->>'id','') = ''
+       or coalesce(project_item->>'num','') !~ '^[0-9]+$'
+       or coalesce(project_item->>'cliente','') = ''
+       or coalesce(project_item->>'proyecto','') = ''
+       or jsonb_typeof(project_item->'pagos') <> 'array'
+    then raise exception 'Invalid project record in backup'; end if;
+    max_num := greatest(max_num, (project_item->>'num')::integer);
+  end loop;
+
+  if p_meta ? 'nextNum' and (p_meta->>'nextNum') ~ '^[0-9]+$' then
+    requested_next := greatest(1,(p_meta->>'nextNum')::integer);
+  end if;
+
+  delete from public.crm_projects where user_id=owner_id;
+  insert into public.crm_projects(user_id,id,num,data,updated_at)
+  select owner_id, value->>'id', (value->>'num')::integer, value, now()
+  from jsonb_array_elements(p_projects);
+
+  delete from public.crm_meta where user_id=owner_id;
+  for meta_item in select key, value from jsonb_each(p_meta)
+  loop
+    insert into public.crm_meta(user_id,key,value,updated_at)
+    values(owner_id,meta_item.key,meta_item.value,now());
+  end loop;
+
+  insert into public.crm_counters(user_id,next_num)
+  values(owner_id,greatest(max_num+1,requested_next))
+  on conflict(user_id) do update
+    set next_num=greatest(excluded.next_num,public.crm_counters.next_num);
+end;
+$$;
+
+revoke all on function public.replace_crm_data(jsonb,jsonb) from public, anon;
+grant execute on function public.replace_crm_data(jsonb,jsonb) to authenticated;
