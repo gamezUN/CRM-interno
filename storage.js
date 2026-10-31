@@ -1,31 +1,75 @@
-/* Capa de almacenamiento. Para migrar a Supabase, reimplementa SOLO estas funciones
-   (mismos nombres y valores devueltos) usando supabase-js; app.js no cambia. */
-const DB_NAME='gamez_crm', DB_VERSION=1, SCHEMA_VERSION=1;
+/* Adaptador de almacenamiento en Supabase.
+   Los datos ya no se guardan en IndexedDB ni se sincronizan desde el navegador.
+   Cada consulta queda limitada al usuario autenticado mediante RLS. */
 const Storage=(()=>{
-  let db;
-  const open=()=>db?Promise.resolve(db):new Promise((ok,no)=>{
-    const r=indexedDB.open(DB_NAME,DB_VERSION);
-    r.onupgradeneeded=e=>{const d=e.target.result;
-      if(!d.objectStoreNames.contains('projects'))d.createObjectStore('projects',{keyPath:'id'});
-      if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta',{keyPath:'key'});};
-    r.onsuccess=()=>{db=r.result;ok(db)};r.onerror=()=>no(r.error);r.onblocked=()=>no(new Error('Base bloqueada por otra pestaña'));
-  });
-  const tx=(stores,mode,fn)=>open().then(d=>new Promise((ok,no)=>{
-    const t=d.transaction(stores,mode);let out;
-    try{out=fn(t)}catch(e){t.abort();return no(e)}
-    t.oncomplete=()=>ok(out&&'result' in out?out.result:undefined);
-    t.onerror=t.onabort=()=>no(t.error||new Error('Transacción cancelada'));
-  }));
-  return{
-    getProjects:()=>tx('projects','readonly',t=>t.objectStore('projects').getAll()),
-    saveProject:p=>tx('projects','readwrite',t=>t.objectStore('projects').put(p)),
-    deleteProject:id=>tx('projects','readwrite',t=>t.objectStore('projects').delete(id)),
-    getMeta:k=>tx('meta','readonly',t=>t.objectStore('meta').get(k)).then(r=>r?r.value:undefined),
-    setMeta:(k,v)=>tx('meta','readwrite',t=>t.objectStore('meta').put({key:k,value:v})),
-    /* Número consecutivo que nunca se reutiliza, aunque se borren proyectos */
-    async nextNumber(){const n=(await this.getMeta('nextNum'))||1;await this.setMeta('nextNum',n+1);return n},
-    replaceAll:(projects,meta)=>tx(['projects','meta'],'readwrite',t=>{
-      const p=t.objectStore('projects'),m=t.objectStore('meta');p.clear();m.clear();
-      projects.forEach(x=>p.put(x));Object.entries(meta).forEach(([key,value])=>m.put({key,value}));return {};})
+  let client=null;
+  const config=window.GAMEZ_SUPABASE_CONFIG||{};
+  const configured=()=>Boolean(
+    config.url && config.publishableKey &&
+    !config.url.includes('TU-PROYECTO') &&
+    !config.publishableKey.includes('PEGA_TU')
+  );
+  const ready=()=>{if(!client)throw new Error('Supabase no está inicializado');return client};
+  const uid=async()=>{const {data,error}=await ready().auth.getUser();if(error)throw error;if(!data.user)throw new Error('Sesión no iniciada');return data.user.id};
+  return {
+    isConfigured:configured,
+    async init(){
+      if(!configured())throw new Error('Configura el Project URL y la Publishable Key en config.js');
+      if(!window.supabase?.createClient)throw new Error('No se pudo cargar la biblioteca de Supabase');
+      client=window.supabase.createClient(config.url,config.publishableKey,{
+        auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+      });
+      return client;
+    },
+    getSession:async()=>{const {data,error}=await ready().auth.getSession();if(error)throw error;return data.session},
+    signIn:async(email,password)=>{const {data,error}=await ready().auth.signInWithPassword({email,password});if(error)throw error;return data},
+    signOut:async()=>{const {error}=await ready().auth.signOut();if(error)throw error},
+    onAuthStateChange:callback=>ready().auth.onAuthStateChange((_event,session)=>callback(session)),
+    getProjects:async()=>{
+      const user_id=await uid();
+      const {data,error}=await ready().from('crm_projects').select('data').eq('user_id',user_id).order('num',{ascending:true});
+      if(error)throw error;
+      return (data||[]).map(row=>row.data);
+    },
+    saveProject:async p=>{
+      const user_id=await uid();
+      const {error}=await ready().from('crm_projects').upsert({
+        user_id,id:String(p.id),num:Number(p.num),data:p,updated_at:new Date().toISOString()
+      },{onConflict:'user_id,id'});
+      if(error)throw error;
+    },
+    deleteProject:async id=>{
+      const user_id=await uid();
+      const {error}=await ready().from('crm_projects').delete().eq('user_id',user_id).eq('id',String(id));
+      if(error)throw error;
+    },
+    getMeta:async key=>{
+      const user_id=await uid();
+      const {data,error}=await ready().from('crm_meta').select('value').eq('user_id',user_id).eq('key',key).maybeSingle();
+      if(error)throw error;return data?data.value:undefined;
+    },
+    setMeta:async(key,value)=>{
+      const user_id=await uid();
+      const {error}=await ready().from('crm_meta').upsert({user_id,key,value,updated_at:new Date().toISOString()},{onConflict:'user_id,key'});
+      if(error)throw error;
+    },
+    nextNumber:async()=>{
+      const {data,error}=await ready().rpc('allocate_crm_project_number');
+      if(error)throw error;return Number(data);
+    },
+    replaceAll:async(projects,meta)=>{
+      const user_id=await uid();
+      const db=ready();
+      const {error:delError}=await db.from('crm_projects').delete().eq('user_id',user_id);
+      if(delError)throw delError;
+      if(projects.length){
+        const rows=projects.map(p=>({user_id,id:String(p.id),num:Number(p.num),data:p,updated_at:new Date().toISOString()}));
+        const {error}=await db.from('crm_projects').upsert(rows,{onConflict:'user_id,id'});if(error)throw error;
+      }
+      const {error:metaDelError}=await db.from('crm_meta').delete().eq('user_id',user_id);
+      if(metaDelError)throw metaDelError;
+      const metaRows=Object.entries(meta).map(([key,value])=>({user_id,key,value,updated_at:new Date().toISOString()}));
+      if(metaRows.length){const {error}=await db.from('crm_meta').upsert(metaRows,{onConflict:'user_id,key'});if(error)throw error}
+    }
   };
 })();
