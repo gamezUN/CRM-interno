@@ -230,10 +230,6 @@ async function startApp(){
   try{
     if(!Storage.isConfigured()){renderLogin('Falta configurar Supabase. Revisa config.js y el archivo de instalación.');return}
     await Storage.init();
-    Storage.onAuthStateChange(async session=>{
-      if(session){try{await startApp()}catch(e){console.error(e);$('#app').innerHTML='<div class="note">No se pudo cargar el CRM. Revisa tu conexión e inténtalo de nuevo.</div>'}}
-      else renderLogin();
-    });
     await startApp();
   }catch(e){console.error(e);renderLogin('No se pudo conectar con Supabase. Revisa la configuración y tu conexión.')}
 })();
