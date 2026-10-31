@@ -25,6 +25,12 @@ const Storage=(()=>{
     signIn:async(email,password)=>{const {data,error}=await ready().auth.signInWithPassword({email,password});if(error)throw error;return data},
     signOut:async()=>{const {error}=await ready().auth.signOut();if(error)throw error},
     onAuthStateChange:callback=>ready().auth.onAuthStateChange((_event,session)=>callback(session)),
+    askAssistant:async messages=>{
+      const {data,error}=await ready().functions.invoke('crm-assistant',{body:{messages}});
+      if(error)throw new Error('El servicio de IA aún no está desplegado o no está configurado en Supabase.');
+      if(!data?.answer)throw new Error('El servicio no devolvió una respuesta válida.');
+      return String(data.answer);
+    },
     getProjects:async()=>{
       const user_id=await uid();
       const {data,error}=await ready().from('crm_projects').select('data').eq('user_id',user_id).order('num',{ascending:true});

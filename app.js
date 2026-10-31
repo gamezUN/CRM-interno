@@ -9,7 +9,7 @@ const DEV=['Pendiente','En desarrollo','En revisión','Entregado','En pausa'];
 const VC={Prospecto:'',      'Contacto realizado':'blue',Negociación:'amber',Ganado:'green',Perdido:'red'};
 const DC={Pendiente:'','En desarrollo':'blue','En revisión':'amber',Entregado:'green','En pausa':'red'};
 const badge=(t,c)=>`<span class="b ${c}">${esc(t)}</span>`;
-const NAV=[['panel','Panel general'],['proyectos','Proyectos'],['clientes','Clientes'],['estadisticas','Estadísticas'],['finanzas','Finanzas'],['respaldos','Respaldos']];
+const NAV=[['panel','Panel general'],['proyectos','Proyectos'],['clientes','Clientes'],['estadisticas','Estadísticas'],['assistant','Asistente IA'],['finanzas','Finanzas'],['respaldos','Respaldos']];
 let P=[],view='panel',month=today().slice(0,7);
 
 const paid=p=>(p.pagos||[]).reduce((a,x)=>a+x.monto,0);
@@ -74,6 +74,7 @@ estadisticas(){
   <div class="card"><h2>Proyectos por estado de desarrollo</h2>${bars(st,'#0f2347')}</div></div>
   <p class="muted">Ventas por fecha de cierre · cobros por fecha de recepción del pago · entregas por fecha real de entrega.</p>`;
 },
+assistant(){return Assistant.render()},
 finanzas(){
   const g=P.filter(won),by={};P.flatMap(p=>p.pagos||[]).forEach(x=>by[x.fecha.slice(0,7)]=(by[x.fecha.slice(0,7)]||0)+x.monto);
   const pend=g.filter(p=>bal(p)>0);
@@ -141,6 +142,7 @@ async function render(){
   $('#title').textContent=NAV.find(n=>n[0]===view)[1];
   $('#nav').innerHTML=NAV.map(([k,t])=>`<button data-v="${k}" class="${k===view?'on':''}">${t}</button>`).join('');
   $('#app').innerHTML=views[view]();
+  if(view==='assistant')Assistant.refresh();
   if(view==='respaldos'){const l=await Storage.getMeta('lastBackup');$('#lb').textContent=l?'Último respaldo: '+new Date(l).toLocaleString('es-MX'):'Aún no has exportado ningún respaldo.'}
 }
 
