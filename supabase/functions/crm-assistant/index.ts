@@ -5,7 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -41,13 +44,28 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Invalid conversation" }, 400);
     }
 
-    const safeMessages = messages.map((m: any) => {
-      if (!m || !["user", "assistant"].includes(m.role) || typeof m.content !== "string") {
-        throw new Error("Invalid message format");
-      }
-      if (m.content.length > 2000) throw new Error("Message is too long");
-      return { role: m.role, content: m.content };
-    });
+const safeMessages: ChatMessage[] = messages.map((m: unknown) => {
+  if (typeof m !== "object" || m === null) {
+    throw new Error("Invalid message format");
+  }
+
+  const message = m as Record<string, unknown>;
+  const role = message.role;
+  const content = message.content;
+
+  if (
+    (role !== "user" && role !== "assistant") ||
+    typeof content !== "string"
+  ) {
+    throw new Error("Invalid message format");
+  }
+
+  if (content.length > 2000) {
+    throw new Error("Message is too long");
+  }
+
+  return { role, content };
+});
     if (safeMessages[safeMessages.length - 1].role !== "user") {
       return json({ error: "A user question is required" }, 400);
     }
@@ -62,10 +80,29 @@ Deno.serve(async (req: Request) => {
 
     // Send only fields needed for business summaries. Contact details,
     // phone numbers, email addresses, notes and payment references are excluded.
-    const projects = (rows || []).map((row: any) => {
+type CrmPayment = {
+  monto?: unknown;
+  fecha?: unknown;
+};
+
+type CrmProjectRow = {
+  data: Record<string, unknown> | null;
+};
+  const projects = (rows || []).map((row: CrmProjectRow) => {
       const p = row.data || {};
-      const payments = Array.isArray(p.pagos) ? p.pagos : [];
-      const paid = payments.reduce((sum: number, payment: any) => sum + Number(payment?.monto || 0), 0);
+const payments: CrmPayment[] = Array.isArray(p.pagos)
+  ? p.pagos.filter(
+      (payment): payment is CrmPayment =>
+        typeof payment === "object" &&
+        payment !== null &&
+        !Array.isArray(payment)
+    )
+  : [];
+      const paid = payments.reduce(
+  (sum: number, payment: CrmPayment) =>
+    sum + Number(payment.monto || 0),
+  0
+);
       const amount = Number(p.importe || 0);
       return {
         number: p.num,
@@ -79,7 +116,10 @@ Deno.serve(async (req: Request) => {
         deadline: p.limite || null,
         follow_up: p.seguimiento || null,
         next_action: String(p.accion || "").slice(0, 180),
-        payment_dates: payments.map((x: any) => ({ date: x.fecha || null, amount: Number(x.monto || 0) })),
+       payment_dates: payments.map((x: CrmPayment) => ({
+  date: x.fecha || null,
+  amount: Number(x.monto || 0)
+})),
       };
     });
 
@@ -117,13 +157,44 @@ Datos del CRM (JSON): ${JSON.stringify(projects)}`;
       return json({ error: "El proveedor de IA no pudo procesar la consulta." }, 502);
     }
 
-    const result = await response.json();
-    const answer = (result.output || [])
-      .flatMap((item: any) => item.content || [])
-      .filter((item: any) => item.type === "output_text")
-      .map((item: any) => item.text)
-      .join("\n")
-      .trim();
+const result: unknown = await response.json();
+
+const output =
+  typeof result === "object" &&
+  result !== null &&
+  "output" in result &&
+  Array.isArray(result.output)
+    ? result.output
+    : [];
+
+const answer = output
+  .flatMap((item: unknown) => {
+    if (
+      typeof item !== "object" ||
+      item === null ||
+      !("content" in item) ||
+      !Array.isArray(item.content)
+    ) {
+      return [];
+    }
+
+    return item.content;
+  })
+  .filter((item): item is { type: "output_text"; text: string } => {
+    if (typeof item !== "object" || item === null) {
+      return false;
+    }
+
+    const content = item as Record<string, unknown>;
+
+    return (
+      content.type === "output_text" &&
+      typeof content.text === "string"
+    );
+  })
+  .map((item) => item.text)
+  .join("\n")
+  .trim();
 
     if (!answer) return json({ error: "La IA devolvió una respuesta vacía." }, 502);
     return json({ answer });
