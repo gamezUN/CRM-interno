@@ -86,6 +86,54 @@ respaldos:()=>`<div class="note">Tus datos se guardan en <b>IndexedDB</b>, dentr
   <p><button class="btn g" data-a="verificar">Verificar datos guardados</button></p><p id="ver"></p></div>`
 };
 
+
+/* Registros iniciales de prospectos revisados el 30/10/2026.
+   La migración es idempotente: no reemplaza ni modifica registros existentes. */
+async function seedReviewedProspects(){
+  const reviewed=[
+    {
+      id:'lead-corazon-contento-20261030',
+      cliente:'Corazón Contento',
+      proyecto:'Sitio web integral para pastelería',
+      contacto:'',
+      tel:'',
+      origen:'Prospección',
+      obs:'Prospecto revisado el 30/10/2026. Alcance solicitado: catálogo de pasteles, búsqueda y filtros, pagos en línea y calendario por cliente para consultar fechas de entrega. Pendiente: solicitar catálogo, variantes/precios, zonas y reglas de entrega, anticipación mínima, disponibilidad por fecha, políticas de cancelación y datos fiscales. Definir proveedor de pago y validar el flujo completo antes de prometer cobros automáticos. Mensaje inicial y levantamiento de requisitos pendientes de confirmar.',
+      registro:'2026-10-30',
+      importe:0,
+      venta:'Prospecto',
+      desarrollo:'Pendiente',
+      pagos:[]
+    },
+    {
+      id:'lead-patricia-hernandez-20261030',
+      cliente:'Boutique de Patricia Hernández',
+      proyecto:'Catálogo digital de temporada',
+      contacto:'Patricia Hernández',
+      tel:'',
+      origen:'Prospección',
+      obs:'Dueña de boutique; interesada en catálogo web de temporada y selección de productos. Reunión propuesta de 20–30 minutos para revisar catálogo, alcance, funciones principales y siguientes pasos. Pendiente confirmar envío del mensaje y fecha/hora de reunión. Solicitar logotipo, fotos, nombres, descripciones, precios, tallas/variantes, disponibilidad y forma de contacto o pedido.',
+      registro:'2026-10-30',
+      importe:0,
+      venta:'Prospecto',
+      desarrollo:'Pendiente',
+      pagos:[]
+    }
+  ];
+  const current=await Storage.getProjects();
+  for(const item of reviewed){
+    const exists=current.some(p=>p.id===item.id || (
+      String(p.cliente||'').trim().toLowerCase()===item.cliente.toLowerCase() &&
+      String(p.proyecto||'').trim().toLowerCase()===item.proyecto.toLowerCase()
+    ));
+    if(!exists){
+      item.num=await Storage.nextNumber();
+      await Storage.saveProject(item);
+      current.push(item);
+    }
+  }
+}
+
 async function render(){
   P=await Storage.getProjects();
   $('#title').textContent=NAV.find(n=>n[0]===view)[1];
@@ -154,6 +202,6 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',e=>{if(e.target.id==='mes'&&e.target.value){month=e.target.value;render()}if(e.target.id==='imp'&&e.target.files[0])importar(e.target.files[0])});
 $('#burger').onclick=()=>$('#side').classList.toggle('open');
 (async()=>{
-  try{await render();if(navigator.storage?.persist)navigator.storage.persist();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js')}
+  try{await seedReviewedProspects();await render();if(navigator.storage?.persist)navigator.storage.persist();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js')}
   catch(e){$('#app').innerHTML=`<div class="note">No se pudo abrir IndexedDB: ${esc(e.message)}. Evita el modo privado.</div>`}
 })();
