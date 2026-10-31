@@ -192,6 +192,7 @@ async function importar(file){
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-a],[data-v]');if(!t)return;const {a,v,id,pid}=t.dataset;
   if(v){view=v;$('#side').classList.remove('open');return render()}
+  if(a==='logout'){await Storage.signOut();renderLogin();return}
   if(a==='nuevo')openForm();else if(a==='editar')openForm(id);else if(a==='pagos')openPagos(id);else if(a==='cerrar')$('#dlg').close();
   else if(a==='borrar'){const p=P.find(x=>x.id===id);if(confirm(`¿Eliminar el proyecto #${p.num} «${p.proyecto}» y sus ${(p.pagos||[]).length} pagos? No se puede deshacer.`)){await Storage.deleteProject(id);toast('Proyecto eliminado');render()}}
   else if(a==='delpago'){const p=P.find(x=>x.id===id);if(confirm('¿Eliminar este pago?')){p.pagos=p.pagos.filter(x=>x.id!==pid);await Storage.saveProject(p);toast('Pago eliminado');await render();openPagos(id)}}
@@ -201,7 +202,38 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',e=>{if(e.target.id==='mes'&&e.target.value){month=e.target.value;render()}if(e.target.id==='imp'&&e.target.files[0])importar(e.target.files[0])});
 $('#burger').onclick=()=>$('#side').classList.toggle('open');
+function renderLogin(message=''){
+  $('#title').textContent='Acceso al CRM';
+  $('#nav').innerHTML='';
+  const out=$('#logout');if(out)out.hidden=true;
+  $('#app').innerHTML=`<div class="card auth-card"><h2>Gámez Desarrollo Web</h2><p class="muted">Inicia sesión para acceder a tus clientes y proyectos.</p>
+  <form id="loginForm"><label>Correo electrónico<input name="email" type="email" autocomplete="username" required></label>
+  <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+  <div class="err" id="loginError">${esc(message)}</div><button class="btn" type="submit">Iniciar sesión</button></form>
+  <p class="muted">La cuenta se administra desde Supabase Authentication. El acceso público no está habilitado.</p></div>`;
+  $('#loginForm').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;const b=f.querySelector('button');b.disabled=true;
+    try{const d=Object.fromEntries(new FormData(f));await Storage.signIn(d.email,d.password);await startApp()}
+    catch(err){$('#loginError').textContent='No se pudo iniciar sesión. Revisa tus datos o la configuración de Supabase.';console.error(err)}
+    finally{b.disabled=false}
+  };
+}
+async function startApp(){
+  const session=await Storage.getSession();
+  if(!session){renderLogin();return}
+  const out=$('#logout');if(out)out.hidden=false;
+  await seedReviewedProspects();
+  await render();
+  if(navigator.storage?.persist)navigator.storage.persist();
+  if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js');
+}
 (async()=>{
-  try{await seedReviewedProspects();await render();if(navigator.storage?.persist)navigator.storage.persist();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js')}
-  catch(e){$('#app').innerHTML=`<div class="note">No se pudo abrir IndexedDB: ${esc(e.message)}. Evita el modo privado.</div>`}
+  try{
+    if(!Storage.isConfigured()){renderLogin('Falta configurar Supabase. Revisa config.js y el archivo de instalación.');return}
+    await Storage.init();
+    Storage.onAuthStateChange(async session=>{
+      if(session){try{await startApp()}catch(e){console.error(e);$('#app').innerHTML='<div class="note">No se pudo cargar el CRM. Revisa tu conexión e inténtalo de nuevo.</div>'}}
+      else renderLogin();
+    });
+    await startApp();
+  }catch(e){console.error(e);renderLogin('No se pudo conectar con Supabase. Revisa la configuración y tu conexión.')}
 })();
