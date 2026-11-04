@@ -31,3 +31,5 @@
 .prospect-nav a:hover{border-color:var(--accent)}
 @media(max-width:1000px){.prospect-grid{grid-template-columns:1fr}.prospect-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.prospect-hero{display:block}.prospect-form{grid-template-columns:1fr}.prospect-form label.full,.prospect-form .actions{grid-column:1}.prospect-kpis{gap:8px}.prospect-kpi{padding:12px}.prospect-kpi strong{font-size:21px}}
+
+#side nav{display:grid;gap:7px}#side nav a{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:9px;color:#b9caff;background:var(--surface-2);text-decoration:none;font-weight:600}#side nav a:hover{border-color:var(--accent);background:var(--surface-3)}
