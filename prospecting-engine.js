@@ -10,7 +10,7 @@ const templates={
 };
 let prospects=[];
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),2600)}
-function score(p){let n=0;if(!p.website)n+=2;if(p.notes.toLowerCase().includes('redes'))n+=2;if(p.notes.toLowerCase().includes('catálogo'))n+=2;if(p.notes.toLowerCase().includes('manual'))n+=2;if(p.notes.toLowerCase().includes('mejorar'))n+=2;return n}
+function score(p){let n=0;const notes=String(p.notes||'').toLowerCase();if(!p.website)n+=2;if(notes.includes('redes'))n+=2;if(notes.includes('catálogo'))n+=2;if(notes.includes('manual'))n+=2;if(notes.includes('mejorar'))n+=2;return n}
 function form(){return `<div class="prospect-grid"><section class="card"><h2>Registrar negocio</h2><p class="muted">Agrega prospectos manualmente o importa un CSV de una fuente que permita su uso comercial.</p><form id="lead-form" class="prospect-form">
 <label>Nombre del negocio *<input name="name" required maxlength="140"></label><label>Giro / sector<input name="business_type" maxlength="100" placeholder="Restaurante, clínica…"></label>
 <label>Sitio web<input name="website" type="url" placeholder="https://"></label><label>Correo comercial<input name="email" type="email"></label><label>Teléfono comercial<input name="phone" type="tel"></label><label>Ciudad<input name="city"></label>
